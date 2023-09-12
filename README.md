@@ -11,8 +11,7 @@ El objetivo de este proyecto es facilitar la elección del proveedor y la regió
 Este proyecto está desarrollado con las siguientes tecnologías:
 
 - Python 3.9 como lenguaje de programación
-- Flask como framework web
-- BeautifulSoup y Requests como librerías para el scraping de datos
+- streamlite
 - Pandas como librería para el análisis y manipulación de datos
 - Bootstrap como framework para el diseño de la interfaz de usuario
 
