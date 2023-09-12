@@ -13,7 +13,6 @@ Este proyecto está desarrollado con las siguientes tecnologías:
 - Python 3.9 como lenguaje de programación
 - streamlite
 - Pandas como librería para el análisis y manipulación de datos
-- Bootstrap como framework para el diseño de la interfaz de usuario
 
 ## Instalación y ejecución
 
