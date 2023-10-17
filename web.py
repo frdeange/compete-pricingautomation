@@ -2,106 +2,72 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import requests
+from aws_data import get_aws_data
+from azure_data import get_azure_data
 
-st.title('AWS EC2 Prices')
 
+st.title("VMs prices across clouds")
+
+
+########################## Sidebar configuration ##########################
 # Sidebar para seleccionar las instancias que queremos consultar
-st.sidebar.header('Select the instances you want to see the prices for')
-st.sidebar.subheader('Instance Type')
-instanceType = st.sidebar.multiselect(
-    'Select the instance type', [
-        'a1',
-        'c5d.xlarge'
-    ]
+st.sidebar.header("Select the type of VM you want to compare")
+st.sidebar.subheader("Instance Type")
+instanceType = st.sidebar.multiselect("Select the instance type", ["a1", "c5d.xlarge"])
+
+st.sidebar.subheader("Price Description")
+priceDescription = st.sidebar.multiselect(
+    "Select the price description",
+    [
+        "Dedicated Reservation Linux",
+        "Dedicated Reservation Windows",
+        "Dedicated Reservation Linux with SQL Server Enterprise",
+    ],
 )
 
-st.sidebar.subheader('Price Description')
-priceDescription = st.sidebar.multiselect(
-    'Select the price description', [
-        'Dedicated Reservation Linux',
-        'Dedicated Reservation Windows',
-        'Dedicated Reservation Linux with SQL Server Enterprise'])
+
+########################## Get data ##########################
 
 
-# Inicializar array con las regiones de AWS que queremos consultar
-aws_regions = ['eu-south-2', 'eu-west-1']
+# Regions we want to get the data from
+aws_regions = ["eu-south-2", "eu-west-1"]
+azure_regions = ["EU West"]
 
-# Crear un dataframe de pandas vacío
-df = pd.DataFrame(columns=["region", "sku", "instanceType",
-                           "vcpu", "memory", "storage", "PriceDescription", "pricePerUnit"])
+# Create empty dataframe
+df = pd.DataFrame(
+    #     columns=[
+    #         "region",
+    #         "sku",
+    #         "instanceType",
+    #         "vcpu",
+    #         "memory",
+    #         "storage",
+    #         "PriceDescription",
+    #         "pricePerUnit",
+    #     ]
+)
 
-# Iterar array
-for aws_region in aws_regions:
-
-    print(aws_region)
-
-    # Obtener el JSON desde la URL
-    # url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-south-2/index.json"
-
-    # Concatenar la URL con la región
-    url = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/" + \
-        aws_region + "/index.json"
-
-    print(url)
-
-    response = requests.get(url)
-    data = response.json()
-
-    # Crear una lista vacía para almacenar los datos de interés
-    rows = []
-
-    # Guardamos la fecha del fichero como un objeto fecha para poder jugar luego con los nombres de fichero
-    publishDate = datetime.strptime(
-        data["publicationDate"], "%Y-%m-%dT%H:%M:%SZ")
-
-    # Recorrer los productos del JSON
-    for product in data["products"].values():
-        # Filtrar solo los productos que tienen atributos de vcpu, memory y storage
-        if "vcpu" in product["attributes"] and "memory" in product["attributes"] and "storage" in product["attributes"] and "instanceType" in product["attributes"]:
-            # Obtener el sku, instanceType, vcpu, memory y storage del producto
-            sku = product["sku"]
-            instance = product["attributes"]["instanceType"]
-            vcpu = product["attributes"]["vcpu"]
-            memory = product["attributes"]["memory"]
-            storage = product["attributes"]["storage"]
-
-            # Buscar el precio por unidad del producto en los términos de oferta
-            pricePerUnit = None
-            # Comprobar si la clave existe antes de acceder a ella
-            if sku in data["terms"]["OnDemand"]:
-                for term in data["terms"]["OnDemand"][sku].values():
-                    pricePerUnit = list(term["priceDimensions"].values())[
-                        0]["pricePerUnit"]["USD"]
-                    PriceDescription = list(term["priceDimensions"].values())[
-                        0]["description"]
-
-            # Añadir una fila con los datos del producto a la lista
-            rows.append([aws_region, sku, instance, vcpu, memory,
-                        storage, PriceDescription, pricePerUnit])
-
-    # Crear un dataframe de pandas con la lista de filas y las columnas deseadas
-    # df = pd.DataFrame(rows, columns=["region", "sku", "instanceType",
-    #                   "vcpu", "memory", "storage", "PriceDescription", "pricePerUnit"])
-
-    # Hacer un append de los datos de cada región
-    df = pd.concat([df, pd.DataFrame(rows, columns=["region", "sku", "instanceType",
-                                                    "vcpu", "memory", "storage", "PriceDescription", "pricePerUnit"])], ignore_index=True)
-
-    # Convertir el dataframe en un archivo excel y guardarlo. Le añadimos la fecha de actualización del fichero que guardamos al principio.
-    # filename = "AWS EC2 Spain Prices " + str(publishDate.year) + str(publishDate.month) + str(publishDate.day) + ".xlsx"
-    # filename = "AWS EC2 Spain Prices.xlsx"
-    # df.to_excel(filename, index=False)
+aws_df = get_aws_data(aws_regions, df)
+azure_df = get_azure_data(azure_regions, df)
 
 
-# st.dataframe(df)
-
-# Si no se ha seleccionado ninguna instancia, pintar el dataframe completo
+st.caption("AWS")
+# If no instance has been selected, paint the complete dataframe
 if not instanceType:
-    st.dataframe(df)
+    st.dataframe(aws_df)
 else:
-    # Pintar el dataframe filtrado por las instancias seleccionadas y WHERE A PARTIAL STRING of the price description is in the priceDescription array
-    st.dataframe(df[df['instanceType'].isin(instanceType) &
-                    df['PriceDescription'].str.contains('|'.join(priceDescription))])
+    # Paint the dataframe filtered by the selected instances and WHERE A PARTIAL STRING of the price description is in the priceDescription array
+    st.dataframe(
+        aws_df[
+            aws_df["instanceType"].isin(instanceType)
+            & aws_df["PriceDescription"].str.contains("|".join(priceDescription))
+        ]
+    )
+
+# A new dataframe for azure
+# azure_df = get_azure_data(azure_regions, df)
+st.caption("Azure")
+st.dataframe(azure_df)
 
 # Añadir un botón para descargar el dataframe como un archivo excel
 # st.download_button(
@@ -109,3 +75,6 @@ else:
 #     data=df.to_excel().encode("utf-8"),
 #     file_name='AWS EC2 Spain Prices.csv',
 # )
+
+# dataframe with width expanded
+# st.dataframe(df.style.set_table_attributes("style='display:inline'").set_caption('Caption table'))
